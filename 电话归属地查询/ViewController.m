@@ -231,6 +231,12 @@
     NSLog(@"点击clear");
     self.askBtn.enabled = NO;
     self.isFind = NO;
+    //清空UI界面上一次操作查询记录
+    self.idLab.text       = [NSString stringWithFormat:@"ID:"];
+    self.numLab.text      = [NSString stringWithFormat:@"Num:"];
+    self.codeLab.text     = [NSString stringWithFormat:@"Code:"];
+    self.cityLab.text     = [NSString stringWithFormat:@"City:"];
+    self.cardtypeLab.text = [NSString stringWithFormat:@"CardType:"];
     return YES;
 }
 
@@ -250,18 +256,23 @@
     NSLog(@"扫描到文档结尾，解析完毕");
     if(self.isFind == YES)
     {
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [MBProgressHUD hideHUD];
-        });
+        NSLog(@"已找到！");
         //置空
         self.isFind = NO;
         
     }
     else
     {
+        NSLog(@"未找到！");
+        //异步返回主线程，隐藏菊花
         dispatch_async(dispatch_get_main_queue(), ^{
-            [MBProgressHUD showError:@"解析该号码失败!"];
+            [MBProgressHUD hideHUD];
         });
+        //确定主线程隐藏菊花之后，才显示解析失败，所以使用同步
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            [MBProgressHUD showError:@"解析该号码失败！"];
+        });
+        //置空
         self.isFind = NO;
     }
 }
@@ -289,21 +300,34 @@
     else if([elementName isEqualToString:@"list"])
     {
         //NSLog(@" 一个list节点读取完毕");
-        if([self.list.num isEqualToString: self.inputTF.text ])
+        
+        //截取前7位
+        NSString *number = [self.inputTF.text substringToIndex:7];
+        if([number isEqualToString: self.list.num ])
         {
+            //异步返回UI主线程，更新UI内容
             dispatch_async(dispatch_get_main_queue(), ^{
                 self.idLab.text       = [NSString stringWithFormat:@"ID:%@", self.list.idid];
                 self.numLab.text      = [NSString stringWithFormat:@"Num:%@", self.list.num];
                 self.codeLab.text     = [NSString stringWithFormat:@"Code:%@", self.list.code];
                 self.cityLab.text     = [NSString stringWithFormat:@"City:%@", self.list.city];
                 self.cardtypeLab.text = [NSString stringWithFormat:@"CardType:%@", self.list.cardtype];
-                NSLog(@"查找到！");
+                NSLog(@"解析过程中查找到该号码！");
                 self.isFind = YES;
-                dispatch_async(dispatch_get_main_queue(), ^{
-                    //
-                    [MBProgressHUD showSuccess:@"成功解析出该号码!"];
-                });
+                
             });
+            
+            //确定UI内容更新后，才将主线程菊花隐藏掉，所以使用同步
+            dispatch_sync(dispatch_get_main_queue(), ^{
+                [MBProgressHUD hideHUD];
+            });
+            
+            //确定隐藏菊花之后，显示解析成功！使用同步
+            dispatch_sync(dispatch_get_main_queue(), ^{
+                [MBProgressHUD showSuccess:@"解析该号码成功！"];
+            });
+            
+            //关键在于如何在此处停止后台解析？
             
         }
     }
@@ -343,63 +367,15 @@
 {
     NSLog(@"点击了查询按钮");
     
-//    //串行队列
-//    dispatch_queue_t serialQueue = dispatch_queue_create("serial", DISPATCH_QUEUE_SERIAL);
-//    
-//    //并行队列
-//    dispatch_queue_t concQueue = dispatch_queue_create("conc", DISPATCH_QUEUE_CONCURRENT);
     
-    //[MBProgressHUD showMessage:@"正在解析文件..."];
-    
-//    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-//        //加载耗时操作
-//        //读取文件，进行解析，耗时操作
-//        NSData *data = [NSData dataWithContentsOfFile:[[NSBundle mainBundle] pathForResource:@"mobilelist" ofType:@"xml"]];
-//        NSXMLParser *parser = [[NSXMLParser alloc] initWithData:data];
-//        parser.delegate = self;
-//        [parser parse];
-//        
-//        dispatch_async(dispatch_get_main_queue(), ^{
-//            //返回UI主线程
-//            
-//        });
-//        
-//    });
-    
-//    //获取主线程(自带特殊串行队列)
-//    dispatch_queue_t main = dispatch_get_main_queue();
-//    
-//    //获取全局(并行队列)
-//    dispatch_queue_t global = dispatch_get_global_queue(0, 0);
-    
-//    dispatch_async(main, ^{
-//        //加载耗时操作
-//        //读取文件，进行解析，耗时操作
-//        NSData *data = [NSData dataWithContentsOfFile:[[NSBundle mainBundle] pathForResource:@"mobilelist" ofType:@"xml"]];
-//        NSXMLParser *parser = [[NSXMLParser alloc] initWithData:data];
-//        parser.delegate = self;
-//        [parser parse];
-//    });
-    
-    
-    //在全局里(并行队列)
+    //在全局里(并行队列)，因为解析过程比较耗时，为了不影响UI界面，所以使用异步
     dispatch_async(dispatch_get_global_queue(0, 0), ^{
-        
         
         //加载耗时操作
         NSData *data = [NSData dataWithContentsOfFile:[[NSBundle mainBundle] pathForResource:@"mobilelist" ofType:@"xml"]];
         NSXMLParser *parser = [[NSXMLParser alloc] initWithData:data];
         parser.delegate = self;
         [parser parse];
-        
-        //回调，即通知主线程刷新
-//        if(self.isFind == YES)
-//        {
-           dispatch_async(dispatch_get_main_queue(), ^{
-        
-                [MBProgressHUD hideHUD];
-            });
-//        }
         
         
     });
